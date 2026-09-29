@@ -18,12 +18,15 @@ export class CreateBrewDto {
   machine!: string;
 
   @IsNumber()
+  @Min(0.1)
   coffeeDose!: number;
 
   @IsNumber()
+  @Min(0.1)
   yield!: number;
 
   @IsInt()
+  @Min(1)
   brewTime!: number;
 
   @IsString()

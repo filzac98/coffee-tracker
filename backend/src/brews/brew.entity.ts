@@ -12,7 +12,10 @@ export class Brew {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => Bean, (bean) => bean.brews, { nullable: false })
+  @ManyToOne(() => Bean, (bean) => bean.brews, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
   bean!: Bean;
 
   @Column()
