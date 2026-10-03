@@ -54,7 +54,7 @@ export default function DeleteBeanButton({
         type="button"
         onClick={handleDelete}
         disabled={isDeleting}
-        className="rounded-xl border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-50"
+        className="rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
       >
         {isDeleting ? "Deleting..." : "Delete bean"}
       </button>

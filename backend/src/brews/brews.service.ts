@@ -50,10 +50,16 @@ export class BrewsService {
       );
     }
 
-    const { beanId, ...brewData } = createBrewDto;
-
     const brew = this.brewRepository.create({
-      ...brewData,
+      brewMethod: createBrewDto.brewMethod,
+      machine: createBrewDto.machine,
+      coffeeDose: createBrewDto.coffeeDose,
+      yield: createBrewDto.yield,
+      brewTime: createBrewDto.brewTime,
+      grindSize: createBrewDto.grindSize,
+      waterTemp: createBrewDto.waterTemp,
+      rating: createBrewDto.rating,
+      notes: createBrewDto.notes,
       bean,
     });
 

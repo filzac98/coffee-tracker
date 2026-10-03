@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BeansModule } from './beans/beans.module';
 import { ConfigModule } from '@nestjs/config';
 import { BrewsModule } from './brews/brews.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { BrewsModule } from './brews/brews.module';
     }),
     BeansModule,
     BrewsModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],

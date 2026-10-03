@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import "./globals.css";
 import Link from "next/link";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Coffee Tracker",
@@ -15,14 +15,35 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <header className="border-b border-[#ded5c8] bg-[#f6f1e9]">
+        <header className="border-b border-[var(--border)] bg-[var(--surface)]">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-            <Link href="/" className="text-xl font-bold text-[#3b2a1d]">
-              Coffee Tracker ☕️
+            <Link
+              href="/"
+              className="flex items-center gap-3 font-semibold tracking-tight"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-lg text-white">
+                ☕
+              </span>
+
+              <span className="text-lg">
+                Coffee Tracker
+              </span>
             </Link>
 
-            <nav className="flex items-center gap-6 text-sm">
-              <Link href="/">Beans</Link>
+            <nav className="flex items-center gap-6 text-sm font-medium">
+              <Link
+                href="/"
+                className="text-[var(--muted)] transition hover:text-[var(--foreground)]"
+              >
+                Beans
+              </Link>
+
+              <Link
+                href="/beans/new"
+                className="rounded-full bg-[var(--accent)] px-4 py-2 text-white transition hover:bg-[var(--accent-hover)]"
+              >
+                + Add bean
+              </Link>
             </nav>
           </div>
         </header>

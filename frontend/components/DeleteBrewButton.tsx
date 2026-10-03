@@ -54,7 +54,7 @@ export default function DeleteBrewButton({
         type="button"
         onClick={handleDelete}
         disabled={isDeleting}
-        className="text-sm font-medium text-red-600 disabled:opacity-50"
+        className="text-sm font-medium text-red-500 transition hover:text-red-700 disabled:opacity-50"
       >
         {isDeleting ? "Deleting..." : "Delete"}
       </button>

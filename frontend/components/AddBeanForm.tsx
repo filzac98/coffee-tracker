@@ -18,178 +18,242 @@ export default function AddBeanForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  function parseDecimal(value: string) {
+    return Number(value.replace(",", "."));
+  }
+
+  function isValidDecimal(value: string) {
+    const number = parseDecimal(value);
+
+    return value.trim() !== "" && Number.isFinite(number);
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    console.log("Submitting bean");
 
     setIsSubmitting(true);
     setError("");
 
+    if (!isValidDecimal(rating)) {
+      setError("Rating must be a valid number.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const parsedRating = parseDecimal(rating);
+
+    if (parsedRating < 1 || parsedRating > 5) {
+      setError("Rating must be between 1 and 5.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const newBean = {
-        name,
-        roaster,
-        origin,
-        process,
-        roastLevel,
-        roastDate,
-        tastingNotes: tastingNotes
+      name,
+      roaster,
+      origin,
+      process,
+      roastLevel,
+      roastDate,
+      tastingNotes: tastingNotes
         .split(",")
         .map((note) => note.trim())
         .filter((note) => note.length > 0),
-        rating: Number(rating),
+      rating: parsedRating,
     };
 
     try {
-        const response = await fetch("http://localhost:3000/beans", {
+      const response = await fetch("http://localhost:3000/beans", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(newBean),
-        });
+      });
 
-        if (!response.ok) {
+      if (!response.ok) {
         throw new Error("Failed to create bean");
-        }
+      }
 
-        const createdBean = await response.json();
+      const createdBean = await response.json();
 
-        router.push(`/beans/${createdBean.id}`);
+      router.push(`/beans/${createdBean.id}`);
     } catch (error) {
-        console.error(error);
-        setError("Something went wrong. Please try again.");
+      console.error(error);
+      setError("Something went wrong. Please try again.");
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   }
 
+  const inputClassName =
+    "mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)]";
+
+  const labelClassName =
+    "block text-sm font-medium text-[var(--foreground)]";
+
   return (
-    <form className="grid max-w-2xl gap-5" onSubmit={handleSubmit}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Bean name</span>
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8"
+    >
+      <div className="grid gap-6 sm:grid-cols-2">
+        {/* Bean name */}
+        <div>
+          <label className={labelClassName}>
+            Bean name
+          </label>
+
           <input
             type="text"
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2"
+            className={inputClassName}
             placeholder="Konga"
           />
-        </label>
+        </div>
 
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Roaster</span>
+        {/* Roaster */}
+        <div>
+          <label className={labelClassName}>
+            Roaster
+          </label>
+
           <input
             type="text"
             required
             value={roaster}
             onChange={(event) => setRoaster(event.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2"
+            className={inputClassName}
             placeholder="Coffee Collective"
           />
-        </label>
-      </div>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Origin</span>
+        {/* Origin */}
+        <div>
+          <label className={labelClassName}>
+            Origin
+          </label>
+
           <input
             type="text"
             required
             value={origin}
             onChange={(event) => setOrigin(event.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2"
+            className={inputClassName}
             placeholder="Ethiopia"
           />
-        </label>
+        </div>
 
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Process</span>
+        {/* Process */}
+        <div>
+          <label className={labelClassName}>
+            Process
+          </label>
+
           <input
             type="text"
             required
             value={process}
             onChange={(event) => setProcess(event.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2"
+            className={inputClassName}
             placeholder="Washed"
           />
-        </label>
-      </div>
+        </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Roast level</span>
+        {/* Roast level */}
+        <div>
+          <label className={labelClassName}>
+            Roast level
+          </label>
 
           <select
             required
             value={roastLevel}
             onChange={(event) => setRoastLevel(event.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2"
+            className={inputClassName}
           >
             <option value="">Select roast level</option>
             <option value="light">Light</option>
             <option value="medium">Medium</option>
             <option value="dark">Dark</option>
           </select>
-        </label>
+        </div>
 
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Roast date</span>
+        {/* Roast date */}
+        <div>
+          <label className={labelClassName}>
+            Roast date
+          </label>
+
           <input
             type="date"
             required
             value={roastDate}
             onChange={(event) => setRoastDate(event.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2"
+            className={inputClassName}
           />
-        </label>
+        </div>
       </div>
 
-      <label className="grid gap-2">
-        <span className="text-sm font-medium">Tasting notes</span>
+      {/* Tasting notes */}
+      <div className="mt-6">
+        <label className={labelClassName}>
+          Tasting notes
+        </label>
+
         <input
           type="text"
           required
           value={tastingNotes}
           onChange={(event) => setTastingNotes(event.target.value)}
-          className="rounded-xl border border-gray-300 px-3 py-2"
+          className={inputClassName}
           placeholder="jasmine, bergamot, peach"
         />
-        <span className="text-xs text-gray-500">
-          Separate tasting notes with commas.
-        </span>
-      </label>
 
-      <label className="grid gap-2">
-        <span className="text-sm font-medium">Rating</span>
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Separate tasting notes with commas.
+        </p>
+      </div>
+
+      {/* Rating */}
+      <div className="mt-6">
+        <label className={labelClassName}>
+          Rating
+          <span className="ml-1 text-[var(--muted)]">
+            (1–5)
+          </span>
+        </label>
+
         <input
-          type="number"
+          type="text"
+          inputMode="decimal"
           required
-          min="1"
-          max="5"
-          step="0.1"
           value={rating}
           onChange={(event) => setRating(event.target.value)}
-          className="rounded-xl border border-gray-300 px-3 py-2"
+          className={inputClassName}
           placeholder="4.5"
         />
-      </label>
+      </div>
 
+      {/* Error */}
       {error && (
-        <p className="text-sm text-red-600">
+        <p className="mt-4 text-sm font-medium text-red-600">
           {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-fit rounded-xl bg-black px-5 py-3 font-medium text-white disabled:opacity-50"
-      >
-        {isSubmitting ? "Adding..." : "Add bean"}
-      </button>
+      {/* Submit */}
+      <div className="mt-6 flex justify-end">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSubmitting ? "Adding bean..." : "Add bean"}
+        </button>
+      </div>
     </form>
   );
 }
