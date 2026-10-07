@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: coffee_user
+      POSTGRES_PASSWORD: coffee_password
+      POSTGRES_DB: coffee_tracker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - coffee-network
+
+  backend:
+    build:
+      context: ./backend
+    ports: 
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: coffee_user
+      DB_PASSWORD: coffee_password
+      DB_NAME: coffee_tracker
+    depends_on:
+      - db
+    networks:
+      - coffee-network
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3001:3000"
+    environment:
+      API_URL: http://backend:3000
+    depends_on:
+      - backend
+    networks:
+      - coffee-network
+  
+volumes:
+  postgres_data:
+
+networks:
+  coffee-network:
+    name: coffee-network

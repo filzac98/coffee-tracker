@@ -2,11 +2,13 @@ import type { Bean } from "@/types/bean";
 import type { DashboardStats } from "@/types/dashboardStats";
 import BeanCard from "@/components/BeanCard";
 import Link from "next/link";
+export const dynamic = "force-dynamic";
+const API_URL = process.env.API_URL ?? "http://localhost:3000";
 
 export default async function Home() {
   const [beansResponse, statsResponse] = await Promise.all([
-    fetch("http://localhost:3000/beans"),
-    fetch("http://localhost:3000/dashboard/stats"),
+    fetch(`${API_URL}/beans`),
+    fetch(`${API_URL}/dashboard/stats`),
   ]);
 
   const beans: Bean[] = await beansResponse.json();
