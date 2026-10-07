@@ -1,5 +1,5 @@
 # Stage 1: install dependencies
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # Stage 3: small final image with only the standalone server
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 ENV HOSTNAME=0.0.0.0
 COPY --from=build /app/public ./public
