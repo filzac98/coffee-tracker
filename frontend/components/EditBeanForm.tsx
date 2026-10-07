@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Bean } from "@/types/bean";
@@ -71,7 +72,7 @@ export default function EditBeanForm({ bean }: EditBeanFormProps) {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/beans/${bean.id}`,
+        `${API_URL}/beans/${bean.id}`,
         {
           method: "PATCH",
           headers: {

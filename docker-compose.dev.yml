@@ -1,0 +1,22 @@
+# Live reload: your code folders are mounted into the containers.
+# Run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  backend:
+    build:
+      context: ./backend
+      target: deps
+    command: npm run start:dev
+    user: node
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      target: deps
+    command: npm run dev
+    user: node
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules

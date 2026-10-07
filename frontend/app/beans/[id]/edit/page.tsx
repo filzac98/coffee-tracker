@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import Link from "next/link";
 import type { Bean } from "@/types/bean";
 import EditBeanForm from "@/components/EditBeanForm";
@@ -14,7 +15,7 @@ export default async function EditBeanPage({
   const { id } = await params;
 
   const response = await fetch(
-    `http://localhost:3000/beans/${id}`
+    `${API_URL}/beans/${id}`
   );
 
   const bean: Bean = await response.json();

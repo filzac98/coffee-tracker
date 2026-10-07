@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import Link from "next/link";
 import AddBrewForm from "@/components/AddBrewForm";
 import BrewCard from "@/components/BrewCard";
@@ -16,8 +17,8 @@ export default async function BeanPage({ params }: BeanPageProps) {
 
   // Fetch the bean and its stats at the same time
   const [beanResponse, statsResponse] = await Promise.all([
-    fetch(`http://localhost:3000/beans/${id}`),
-    fetch(`http://localhost:3000/beans/${id}/stats`),
+    fetch(`${API_URL}/beans/${id}`),
+    fetch(`${API_URL}/beans/${id}/stats`),
   ]);
 
   const bean: Bean = await beanResponse.json();

@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Brew } from "@/types/brew";
@@ -102,7 +103,7 @@ export default function EditBrewForm({ brew }: EditBrewFormProps) {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/brews/${brew.id}`,
+        `${API_URL}/brews/${brew.id}`,
         {
           method: "PATCH",
           headers: {

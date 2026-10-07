@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -63,7 +64,7 @@ export default function AddBeanForm() {
     };
 
     try {
-      const response = await fetch("http://localhost:3000/beans", {
+      const response = await fetch(`${API_URL}/beans`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

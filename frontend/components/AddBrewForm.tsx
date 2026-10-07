@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -97,7 +98,7 @@ if (parsedRating < 1 || parsedRating > 5) {
     };
 
     try {
-      const response = await fetch("http://localhost:3000/brews", {
+      const response = await fetch(`${API_URL}/brews`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

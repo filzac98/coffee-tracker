@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -29,7 +30,7 @@ export default function DeleteBrewButton({
 
     try {
       const response = await fetch(
-        `http://localhost:3000/brews/${brewId}`,
+        `${API_URL}/brews/${brewId}`,
         {
           method: "DELETE",
         },

@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import Link from "next/link";
 import type { Brew } from "@/types/brew";
 import EditBrewForm from "@/components/EditBrewForm";
@@ -14,7 +15,7 @@ export default async function EditBrewPage({
   const { id } = await params;
 
   const response = await fetch(
-    `http://localhost:3000/brews/${id}`
+    `${API_URL}/brews/${id}`
   );
 
   const brew: Brew = await response.json();

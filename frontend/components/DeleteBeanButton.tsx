@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -29,7 +30,7 @@ export default function DeleteBeanButton({
 
     try {
       const response = await fetch(
-        `http://localhost:3000/beans/${beanId}`,
+        `${API_URL}/beans/${beanId}`,
         {
           method: "DELETE",
         },
