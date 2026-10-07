@@ -2,13 +2,18 @@ services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_USER: coffee_user
-      POSTGRES_PASSWORD: coffee_password
-      POSTGRES_DB: coffee_tracker
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - coffee-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -18,11 +23,12 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USERNAME: coffee_user
-      DB_PASSWORD: coffee_password
-      DB_NAME: coffee_tracker
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - coffee-network
 
