@@ -1,106 +1,69 @@
 # Coffee Tracker
 
-Coffee Tracker is a full-stack web application for tracking coffee beans and espresso brews. Users can manage beans and brews and view statistics through a dashboard.
+A full-stack application for tracking coffee beans and espresso brews, containerized with Docker and Docker Compose.
 
-The application consists of three services:
+## 1. Overview
 
-- **Frontend:** Next.js
-- **Backend:** NestJS REST API
-- **Database:** PostgreSQL
+Coffee Tracker lets users add, edit and delete coffee beans, log brews (dose, yield, brew time, grind size, water temperature and rating), and view statistics on a dashboard.
 
-For the Development Environments project, the application has been containerized using Docker and Docker Compose. The complete application can be started as a multi-container environment with persistent database storage and an isolated Docker network.
+Docker Compose manages three services:
 
----
+| Service | Technology | Role |
+| --- | --- | --- |
+| `frontend` | Next.js | Serves the web application |
+| `backend` | NestJS + TypeORM | REST API for beans, brews and statistics |
+| `db` | PostgreSQL 17 | Stores application data |
 
-## Docker Architecture
+Compose also manages the named network `coffee-net` and the persistent volume `coffee-db-data`.
 
-The Docker environment consists of three services:
+## 2. Architecture
 
-| Service | Technology | Host Port | Container Port |
-| --- | --- | --- | --- |
-| `frontend` | Next.js | 3001 | 3000 |
-| `backend` | NestJS | 3000 | 3000 |
-| `db` | PostgreSQL 17 | Not exposed | 5432 |
+```mermaid
+flowchart LR
+    browser["Browser on host"]
 
-The services communicate through the named Docker network `coffee-network`.
+    subgraph net ["coffee-net"]
+        frontend["frontend<br/>Next.js :3000"]
+        backend["backend<br/>NestJS :3000"]
+        db["db<br/>PostgreSQL :5432"]
+    end
 
-The frontend communicates with the backend internally using:
+    volume[("coffee-db-data")]
 
-```text
-http://backend:3000
+    browser -- "localhost:3001" --> frontend
+    browser -- "localhost:3000" --> backend
+    frontend -- "backend:3000" --> backend
+    backend -- "db:5432" --> db
+    db -- "/var/lib/postgresql/data" --> volume
 ```
 
-The backend connects to PostgreSQL using:
+There is an important distinction between host and container networking:
 
-```text
-db:5432
-```
+- The browser loads the frontend from `localhost:3001`.
+- Browser-side requests call the backend through `localhost:3000`.
+- Server-rendered Next.js code runs inside Docker and calls `backend:3000`.
+- The backend connects to PostgreSQL through `db:5432`.
+- PostgreSQL is not exposed to the host because only the backend needs direct database access.
 
-The PostgreSQL port is not published to the host because only the backend needs direct access to the database.
+## 3. Prerequisites
 
-PostgreSQL data is stored in the named volume `postgres_data`, allowing database data to persist when containers are stopped or recreated.
+To run the application:
 
-The architecture can be represented as:
+- Docker Desktop or Docker Engine with Docker Compose
+- Ports `3000` and `3001` available
+- A `.env` file in the project root
 
-```text
-Browser
-   |
-   | localhost:3001
-   v
-Frontend
-Next.js :3000
-   |
-   | http://backend:3000
-   v
-Backend
-NestJS :3000
-   |
-   | db:5432
-   v
-PostgreSQL :5432
-   |
-   v
-postgres_data
-```
-
----
-
-## Prerequisites
-
-To run the application, you need:
-
-- Docker
-- Docker Compose
-
-No local installation of Node.js or PostgreSQL is required when running the application through Docker.
-
----
-
-## Environment Setup
-
-The Docker environment uses environment variables for the PostgreSQL configuration.
-
-An example configuration is included in `.env.example`.
-
-Create a local `.env` file from the example:
+Create the environment file from the provided example:
 
 ```bash
 cp .env.example .env
 ```
 
-The default development configuration is:
+The `.env` file contains the database configuration used by PostgreSQL and the backend. It is ignored by Git so local credentials are not committed.
 
-```env
-POSTGRES_USER=coffee_user
-POSTGRES_PASSWORD=coffee_password
-POSTGRES_DB=coffee_tracker
-```
+No local installation of Node.js or PostgreSQL is required when running the application through Docker.
 
-The `.env` file is ignored by Git and should not be committed.
-
----
-
-## Running the Application
+## 4. Running and Stopping
 
 Build the images and start all services:
 
@@ -108,500 +71,276 @@ Build the images and start all services:
 docker compose up --build -d
 ```
 
-Check that the containers are running:
+Check their status:
 
 ```bash
 docker compose ps
 ```
 
-The application is then available at:
+The database and backend should report a healthy status.
 
-- Frontend: `http://localhost:3001`
-- Backend API: `http://localhost:3000`
+Open the application at:
 
-To stop and remove the containers and Docker network:
+```text
+http://localhost:3001
+```
+
+No manual database setup is required. TypeORM creates the tables when the backend starts.
+
+Stop and remove the containers and network:
 
 ```bash
 docker compose down
 ```
 
-The PostgreSQL data is stored in a named Docker volume and is therefore not removed by `docker compose down`.
-
-To start the application again without rebuilding unchanged images:
+Start again without rebuilding:
 
 ```bash
 docker compose up -d
 ```
 
----
+`docker compose down` keeps the database volume, so application data survives.
 
-## Docker Configuration
+Do not use `docker compose down -v` as routine cleanup because `-v` also deletes the database volume.
 
-Docker Compose manages the three services defined in `docker-compose.yml`:
+## 5. Docker Configuration
 
-- `frontend`
-- `backend`
-- `db`
+The main Docker configuration consists of:
 
-The frontend and backend images are built from Dockerfiles located in their respective directories.
+| File | Purpose |
+| --- | --- |
+| `docker-compose.yml` | Services, ports, environment variables, health checks, resource limits, network and volume |
+| `backend/Dockerfile` | Multi-stage backend build and Docker test stage |
+| `frontend/Dockerfile` | Multi-stage Next.js standalone build |
+| `*/.dockerignore` | Excludes unnecessary files from Docker build contexts |
+| `docker-compose.dev.yml` | Optional development setup with hot reload |
 
-Both application images use multi-stage builds to separate the build environment from the final runtime environment.
+Both Dockerfiles use `node:24-alpine` and multi-stage builds.
 
----
+The general build process is:
 
-## Backend Docker Image
+1. Install dependencies in a dedicated stage.
+2. Build the application in a separate stage.
+3. Copy only the files required at runtime into a clean final image.
+4. Run the application as the non-root `node` user.
 
-The NestJS backend uses a multi-stage Docker build.
+Separating build and runtime stages keeps development dependencies, source files and build tools out of the final runtime images.
 
-### Builder Stage
-
-The builder stage:
-
-1. Uses `node:22-alpine`
-2. Installs all dependencies with `npm ci`
-3. Copies the application source
-4. Compiles the NestJS application with `npm run build`
-
-### Runner Stage
-
-The final runner stage:
-
-1. Uses a fresh `node:22-alpine` image
-2. Installs only production dependencies using:
+The backend additionally uses:
 
 ```bash
-npm ci --omit=dev
+npm prune --omit=dev
 ```
 
-3. Copies only the compiled `dist` directory from the builder
-4. Runs the application as the built-in non-root `node` user
-5. Starts the application using:
+to remove development dependencies before they are copied into the runtime image.
 
-```text
-node dist/main.js
-```
-
-This keeps development dependencies and the TypeScript source out of the final runtime image.
-
----
-
-## Frontend Docker Image
-
-The Next.js frontend also uses a multi-stage Docker build.
-
-Next.js is configured with:
+The frontend uses Next.js:
 
 ```ts
 output: "standalone"
 ```
 
-During the build, Next.js generates a standalone production server containing the dependencies required to run the application.
+which creates a smaller self-contained production server.
 
-The final runner image only receives:
+## 6. Health Checks and Start Order
 
-- The standalone Next.js server
-- Required runtime dependencies
-- Next.js static assets
-- Files from the `public` directory
+A running container does not necessarily mean that the application inside it is ready.
 
-The application is started using:
+PostgreSQL therefore checks its readiness using `pg_isready`.
+
+The backend waits until the database is healthy before starting. The backend then checks its own `/dashboard/stats` endpoint, and the frontend waits until the backend is healthy.
+
+The startup sequence is therefore:
 
 ```text
-node server.js
+PostgreSQL starts
+       ↓
+Database becomes healthy
+       ↓
+Backend starts
+       ↓
+Backend becomes healthy
+       ↓
+Frontend starts
 ```
 
-The frontend also runs as the non-root `node` user.
-
----
-
-## Image Optimization
-
-The original frontend and backend Dockerfiles used single-stage builds. This meant that build tools, development dependencies and other files remained in the final images.
-
-After introducing multi-stage builds and Next.js standalone output, the image sizes were reduced:
-
-| Image | Before | After | Reduction |
-| --- | ---: | ---: | ---: |
-| Backend | 727 MB | 422 MB | ~42% |
-| Frontend | 1.42 GB | 329 MB | ~77% |
-
-The image sizes can be inspected using:
+Health status can be inspected using:
 
 ```bash
-docker image ls | grep coffee-tracker
+docker compose ps
 ```
 
----
+## 7. Volumes and Persistence
 
-## Non-Root Containers
+PostgreSQL stores its data in the named volume `coffee-db-data`, mounted at `/var/lib/postgresql/data`.
 
-Both application containers run as the built-in `node` user instead of root.
+The volume exists independently of the database container.
 
-This can be verified using:
+| Command | Containers | Network | Volume and Data |
+| --- | --- | --- | --- |
+| `docker compose stop` | Stopped | Kept | Kept |
+| `docker compose down` | Removed | Removed | Kept |
+| `docker compose down -v` | Removed | Removed | **Deleted** |
+
+Persistence was tested by creating a bean, removing the containers with `docker compose down`, starting the environment again and confirming that the bean still existed.
+
+## 8. Networking
+
+All three services share the named Docker network `coffee-net`.
+
+Docker provides internal DNS resolution, allowing containers to communicate using service names instead of changing IP addresses.
+
+| Service | Host Access | Internal Docker Address |
+| --- | --- | --- |
+| `frontend` | `localhost:3001` | `frontend:3000` |
+| `backend` | `localhost:3000` | `backend:3000` |
+| `db` | None | `db:5432` |
+
+The backend publishes port `3000` because browser-side code calls it directly.
+
+PostgreSQL does not publish port `5432` to the host because only the backend needs database access.
+
+## 9. Security and Efficiency
+
+| Choice | Effect |
+| --- | --- |
+| Multi-stage builds | Build tools and unnecessary files stay out of runtime images |
+| `node:24-alpine` | Provides a small Node.js base image |
+| `npm prune --omit=dev` | Removes backend development dependencies |
+| Next.js standalone output | Reduces frontend runtime requirements |
+| Dependency layers before source | Allows Docker to cache `npm ci` |
+| `USER node` | Application processes do not run as root |
+| No database host port | PostgreSQL is only accessible through `coffee-net` |
+| Resource limits | Prevent services from consuming unrestricted host resources |
+
+The application user can be verified with:
 
 ```bash
 docker compose exec backend whoami
 docker compose exec frontend whoami
 ```
 
-Expected output:
+Both should return:
 
 ```text
 node
-node
 ```
 
-Running the application processes as a non-root user limits their privileges inside the containers.
+This means the application processes run as non-root users inside their containers. It does not mean that the Docker daemon itself is running in rootless mode.
 
-This refers to non-root application execution inside the containers and should not be confused with running the Docker daemon itself in rootless mode.
+### Resource Limits
 
----
+| Service | CPU | Memory |
+| --- | ---: | ---: |
+| `db` | 0.5 CPU | 256 MB |
+| `backend` | 0.5 CPU | 256 MB |
+| `frontend` | 0.5 CPU | 512 MB |
 
-## Networking
-
-All three services are connected to the named Docker network:
-
-```text
-coffee-network
-```
-
-Docker Compose provides internal DNS resolution, allowing containers to communicate using service names rather than IP addresses.
-
-For example, the backend connects to PostgreSQL using:
-
-```text
-db:5432
-```
-
-instead of a container IP address.
-
-The frontend's server-side code communicates with the backend using:
-
-```text
-http://backend:3000
-```
-
-The network can be inspected using:
-
-```bash
-docker network inspect coffee-network
-```
-
-The database does not publish port `5432` to the host because database access is only required from the backend container.
-
----
-
-## Database Persistence
-
-PostgreSQL stores its data in the named Docker volume:
-
-```text
-postgres_data
-```
-
-The volume is mounted at PostgreSQL's data directory inside the database container.
-
-This means the database container can be removed and recreated without deleting the application data.
-
-Persistence can be tested with:
-
-```bash
-docker compose down
-docker volume ls
-docker compose up -d
-```
-
-After recreating the containers, existing data can still be retrieved from the backend:
-
-```bash
-curl http://localhost:3000/beans
-```
-
-Do not use:
-
-```bash
-docker compose down -v
-```
-
-when the database data should be retained, because the `-v` option also removes the named volume.
-
----
-
-## Database Health Check
-
-The PostgreSQL service has a Docker health check using `pg_isready`.
-
-Docker checks whether PostgreSQL is ready to accept connections every five seconds.
-
-The backend depends on the database using:
-
-```yaml
-depends_on:
-  db:
-    condition: service_healthy
-```
-
-This means the backend does not start simply because the database container is running. It waits until PostgreSQL reports that it is healthy and ready to accept connections.
-
-The health status can be checked with:
-
-```bash
-docker compose ps
-```
-
-A healthy database will appear as:
-
-```text
-Up (healthy)
-```
-
----
-
-## Environment Variables
-
-Database configuration is stored in the root `.env` file.
-
-Docker Compose reads these values and supplies them to both PostgreSQL and the backend.
-
-For example:
-
-```text
-POSTGRES_USER
-POSTGRES_PASSWORD
-POSTGRES_DB
-```
-
-are used to configure PostgreSQL and are mapped to the corresponding backend database configuration.
-
-The real `.env` file is excluded from Git, while `.env.example` documents the variables required to run the project.
-
-The fully resolved Compose configuration can be inspected with:
-
-```bash
-docker compose config
-```
-
-Note that this command may display resolved environment values, including passwords, in the terminal.
-
----
-
-## Testing
-
-The containerized environment was tested at several levels.
-
-### Service Status
-
-```bash
-docker compose ps
-```
-
-This verifies that the frontend, backend and database containers are running and that PostgreSQL is healthy.
-
-### Backend API
-
-The backend can be tested directly using:
-
-```bash
-curl http://localhost:3000/beans
-```
-
-### Database Persistence
-
-A test bean was created through the API.
-
-The containers were then removed using:
-
-```bash
-docker compose down
-```
-
-After recreating the environment:
-
-```bash
-docker compose up -d
-```
-
-the bean was still available, confirming that PostgreSQL data persisted in the named volume.
-
-### Non-Root Execution
-
-The runtime users were checked using:
-
-```bash
-docker compose exec backend whoami
-docker compose exec frontend whoami
-```
-
-Both returned:
-
-```text
-node
-```
-
-### Compose Configuration
-
-The final resolved Docker Compose configuration was checked using:
-
-```bash
-docker compose config
-```
-
-### Logs
-
-Service logs can be inspected using:
-
-```bash
-docker compose logs
-```
-
-or for a specific service:
-
-```bash
-docker compose logs db
-docker compose logs backend
-docker compose logs frontend
-```
-
----
-
-## Resource Usage
-
-Runtime resource usage can be inspected using:
+Runtime usage can be inspected with:
 
 ```bash
 docker stats --no-stream
 ```
 
-During an idle test, the containers used approximately:
+### Image Size
 
-| Service | Memory Usage | CPU |
+Measured with `docker image ls`:
+
+| Backend Image | Disk Usage | Compressed |
 | --- | ---: | ---: |
-| Frontend | 31.46 MiB | ~0% |
-| Backend | 39.56 MiB | ~0% |
-| PostgreSQL | 21.89 MiB | ~0% |
+| Source + development dependencies | 728 MB | 148 MB |
+| Final runtime image | 388 MB | 78 MB |
 
-The complete stack therefore used approximately 93 MiB of memory while idle.
+The final backend runtime image is approximately 47% smaller on disk.
 
-These values represent a local idle snapshot and are not intended as measurements of performance under production load.
+## 10. Testing and Verification
 
----
+Validate the Compose configuration:
+
+```bash
+docker compose config
+```
+
+Check container health:
+
+```bash
+docker compose ps
+```
+
+Inspect backend logs:
+
+```bash
+docker compose logs backend --tail=20
+```
+
+Run the backend unit tests in Docker:
+
+```bash
+docker compose run --rm --build backend-test
+```
+
+The `backend-test` service uses the `test` profile, so it is not started during a normal `docker compose up`.
+
+Verify that the applications run as non-root:
+
+```bash
+docker compose exec backend whoami
+docker compose exec frontend whoami
+```
+
+Inspect runtime resource usage:
+
+```bash
+docker stats --no-stream
+```
+
+## 11. Development Setup
+
+An optional `docker-compose.dev.yml` provides a development configuration with mounted source folders and hot reload.
+
+It can be started with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+The backend uses `npm run start:dev` and the frontend uses `npm run dev`.
+
+This development configuration is optional and has not been fully verified.
+
+## 12. Limitations and Next Steps
+
+| Limitation | Current Approach |
+| --- | --- |
+| Browser API URL and CORS use localhost | Intended for local development |
+| TypeORM uses `synchronize: true` | Suitable for the current local project; migrations would be preferable for production |
+| Backend has unit tests but no automated end-to-end tests | Full application flow is currently tested manually |
+| Development Compose setup has not been fully verified | Optional future improvement |
+
+Possible future improvements include:
+
+- TypeORM database migrations
+- Automated end-to-end testing
+- CI/CD for automated builds and tests
+- Production secrets management
+- Deployment to a remote environment
 
 ## Project Structure
 
 ```text
 coffee-tracker/
 ├── backend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── ...
-│
+│   ├── src/
+│   └── Dockerfile
 ├── frontend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── ...
-│
-├── .env.example
-├── .gitignore
+│   ├── app/
+│   └── Dockerfile
 ├── docker-compose.yml
+├── docker-compose.dev.yml
+├── .env.example
 └── README.md
 ```
 
-The local `.env` files are ignored by Git and are therefore not included in the repository.
-
 ---
 
-## Useful Docker Commands
-
-Build and start the application:
-
-```bash
-docker compose up --build -d
-```
-
-Start using existing images:
-
-```bash
-docker compose up -d
-```
-
-Check service status:
-
-```bash
-docker compose ps
-```
-
-Stop the application:
-
-```bash
-docker compose down
-```
-
-View logs:
-
-```bash
-docker compose logs
-```
-
-Inspect the Docker network:
-
-```bash
-docker network inspect coffee-network
-```
-
-List Docker volumes:
-
-```bash
-docker volume ls
-```
-
-Inspect resource usage:
-
-```bash
-docker stats --no-stream
-```
-
-Verify the runtime user:
-
-```bash
-docker compose exec backend whoami
-docker compose exec frontend whoami
-```
-
-Validate and inspect the resolved Compose configuration:
-
-```bash
-docker compose config
-```
-
----
-
-## Limitations and Further Improvements
-
-The current setup is intended for local development and demonstration rather than production deployment.
-
-Possible future improvements include:
-
-- Adding application-level health checks for the backend and frontend
-- Using a dedicated secrets management solution for production credentials
-- Adding resource limits for containers
-- Adding automated container tests to a CI/CD pipeline
-- Deploying the containerized application to a remote server
-
----
-
-## Development Environments Project
-
-This project demonstrates how an existing full-stack application can be containerized and managed as a reproducible multi-container environment using Docker and Docker Compose.
-
-The setup demonstrates:
-
-- Containerization of frontend and backend applications
-- Multi-stage Docker builds
-- Non-root application execution
-- PostgreSQL in Docker
-- Persistent storage using a named volume
-- Container networking using a named network
-- Service readiness using a database health check
-- Environment-based configuration
-- Image optimization
-- Runtime resource inspection
+Built for the Web PBA Autumn 2026 Development Environments project: containerizing an existing full-stack application with Docker and Docker Compose.
