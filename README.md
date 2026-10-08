@@ -1,346 +1,180 @@
 # Coffee Tracker
 
-A full-stack application for tracking coffee beans and espresso brews, containerized with Docker and Docker Compose.
+A full-stack app for tracking coffee beans and espresso brews, containerised with Docker Compose.
 
 ## 1. Overview
 
-Coffee Tracker lets users add, edit and delete coffee beans, log brews (dose, yield, brew time, grind size, water temperature and rating), and view statistics on a dashboard.
+Coffee Tracker lets you add, edit and delete coffee beans, log brews (dose, yield, brew time, grind size, water temperature, rating) and see statistics on a dashboard.
 
-Docker Compose manages three services:
+Docker Compose starts, connects and stops three services:
 
-| Service | Technology | Role |
-| --- | --- | --- |
-| `frontend` | Next.js | Serves the web application |
-| `backend` | NestJS + TypeORM | REST API for beans, brews and statistics |
-| `db` | PostgreSQL 17 | Stores application data |
+| Service    | Technology        | Image                               | Role                            |
+| ---------- | ----------------- | ----------------------------------- | ------------------------------- |
+| `frontend` | Next.js           | built from `frontend/Dockerfile`    | Serves the pages to the browser |
+| `backend`  | NestJS + TypeORM  | built from `backend/Dockerfile`     | REST API for beans, brews, stats |
+| `db`       | PostgreSQL 17     | `postgres:17-alpine` (Docker Hub)   | Stores the data                 |
 
-Compose also manages the named network `coffee-net` and the persistent volume `coffee-db-data`.
+Compose also manages the network `coffee-net` and the volume `coffee-db-data`.
 
 ## 2. Architecture
 
 ```mermaid
 flowchart LR
-    browser["Browser on host"]
-
+    browser["Browser on the host"]
     subgraph net ["coffee-net"]
-        frontend["frontend<br/>Next.js :3000"]
-        backend["backend<br/>NestJS :3000"]
-        db["db<br/>PostgreSQL :5432"]
+        frontend["frontend<br/>Next.js, port 3000"]
+        backend["backend<br/>NestJS, port 3000"]
+        db["db<br/>PostgreSQL, port 5432"]
     end
-
     volume[("coffee-db-data")]
 
     browser -- "localhost:3001" --> frontend
     browser -- "localhost:3000" --> backend
-    frontend -- "backend:3000" --> backend
+    frontend -- "http://backend:3000" --> backend
     backend -- "db:5432" --> db
     db -- "/var/lib/postgresql/data" --> volume
 ```
 
-There is an important distinction between host and container networking:
-
-- The browser loads the frontend from `localhost:3001`.
-- Browser-side requests call the backend through `localhost:3000`.
-- Server-rendered Next.js code runs inside Docker and calls `backend:3000`.
-- The backend connects to PostgreSQL through `db:5432`.
-- PostgreSQL is not exposed to the host because only the backend needs direct database access.
+- The browser loads pages from the frontend on `localhost:3001`.
+- Forms and delete buttons run in the browser and call the backend directly on `localhost:3000`.
+- Server-rendered pages run inside the frontend container and call the backend as `backend:3000`.
+- Only the backend talks to `db`. Postgres stores its data in the named volume `coffee-db-data`.
 
 ## 3. Prerequisites
 
-To run the application:
-
-- Docker Desktop or Docker Engine with Docker Compose
-- Ports `3000` and `3001` available
-- A `.env` file in the project root
-
-Create the environment file from the provided example:
+- Docker Desktop (or Docker Engine) with Compose, running.
+- Ports `3000` and `3001` free on your machine.
+- A `.env` file in the project root. Create it from the example:
 
 ```bash
 cp .env.example .env
 ```
 
-The `.env` file contains the database configuration used by PostgreSQL and the backend. It is ignored by Git so local credentials are not committed.
+`.env` holds `DB_NAME`, `DB_USERNAME` and `DB_PASSWORD`. Compose passes them to `db` and `backend`. `.env` is git-ignored, so real passwords never reach the repository.
 
-No local installation of Node.js or PostgreSQL is required when running the application through Docker.
+## 4. Running and stopping
 
-## 4. Running and Stopping
-
-Build the images and start all services:
+From the project root:
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d   # build images and start all services
+docker compose ps              # db and backend should show (healthy)
 ```
 
-Check their status:
+Open http://localhost:3001.
+
+No manual database setup is needed. TypeORM creates the tables when the backend starts.
 
 ```bash
-docker compose ps
+docker compose down            # stop and remove containers and network
+docker compose up -d           # start again without rebuilding
 ```
 
-The database and backend should report a healthy status.
+`docker compose down` keeps the volume, so your data survives. **Do not use `docker compose down -v` as routine cleanup.** It deletes `coffee-db-data` and all data with it.
 
-Open the application at:
+## 5. Docker configuration
 
-```text
-http://localhost:3001
-```
+| File                     | Role |
+| ------------------------ | ---- |
+| `docker-compose.yml`     | Services, ports, environment variables, healthchecks, start order, resource limits, network and volume |
+| `backend/Dockerfile`     | Multi-stage build: `deps`, `test`, `build` and a small runtime stage |
+| `frontend/Dockerfile`    | Multi-stage build: `deps`, `build` and a small runtime stage (Next.js standalone) |
+| `*/.dockerignore`        | Keeps `node_modules`, build output, `.env`, `coverage` and Markdown out of the build context |
 
-No manual database setup is required. TypeORM creates the tables when the backend starts.
+Both Dockerfiles follow the same pattern on `node:24-alpine`:
 
-Stop and remove the containers and network:
+1. `deps` copies only `package*.json` and runs `npm ci`. This layer is cached while dependencies are unchanged.
+2. `build` copies the source and builds the app. The backend then removes dev dependencies with `npm prune --omit=dev`.
+3. The runtime stage starts from a clean image, copies only the build output and runs as `USER node`.
 
-```bash
-docker compose down
-```
+**Start order:** `db` checks itself with `pg_isready`. `backend` waits until `db` is healthy and checks itself by calling `/dashboard/stats`. `frontend` waits until `backend` is healthy.
 
-Start again without rebuilding:
+**Resource limits:** `db` and `backend` 0.5 CPU and 256 MB, `frontend` 0.5 CPU and 512 MB.
 
-```bash
-docker compose up -d
-```
+Run `docker compose config` to see the resolved configuration with the values from `.env`.
 
-`docker compose down` keeps the database volume, so application data survives.
+## 6. Volumes and persistence
 
-Do not use `docker compose down -v` as routine cleanup because `-v` also deletes the database volume.
+| Volume           | Mounted at                              | Stores |
+| ---------------- | --------------------------------------- | ------ |
+| `coffee-db-data` | `/var/lib/postgresql/data` in `db`      | All Postgres tables and rows |
 
-## 5. Docker Configuration
+| Command                  | Containers        | Network  | Volume and data |
+| ------------------------ | ----------------- | -------- | --------------- |
+| `docker compose stop`    | stopped, kept     | kept     | kept            |
+| `docker compose down`    | removed           | removed  | kept            |
+| `docker compose down -v` | removed           | removed  | **deleted**     |
 
-The main Docker configuration consists of:
+**Tested:** We created a bean in the browser, confirmed it with `psql`, ran `docker compose down` and `docker compose up -d`, and the bean was still there. New containers, same volume.
 
-| File | Purpose |
-| --- | --- |
-| `docker-compose.yml` | Services, ports, environment variables, health checks, resource limits, network and volume |
-| `backend/Dockerfile` | Multi-stage backend build and Docker test stage |
-| `frontend/Dockerfile` | Multi-stage Next.js standalone build |
-| `*/.dockerignore` | Excludes unnecessary files from Docker build contexts |
-| `docker-compose.dev.yml` | Optional development setup with hot reload |
+## 7. Networking
 
-Both Dockerfiles use `node:24-alpine` and multi-stage builds.
+All three services share the named network `coffee-net`. Containers reach each other by service name.
 
-The general build process is:
+| Service    | Host port (browser) | Internal name and port (containers) |
+| ---------- | ------------------- | ----------------------------------- |
+| `frontend` | `localhost:3001`    | `frontend:3000`                     |
+| `backend`  | `localhost:3000`    | `backend:3000`                      |
+| `db`       | none                | `db:5432`                           |
 
-1. Install dependencies in a dedicated stage.
-2. Build the application in a separate stage.
-3. Copy only the files required at runtime into a clean final image.
-4. Run the application as the non-root `node` user.
+The backend publishes port 3000 because browser-side code calls it directly. The database is **not** exposed to the host. Only the backend needs it, and `docker compose ps` shows `5432/tcp` without a host mapping.
 
-Separating build and runtime stages keeps development dependencies, source files and build tools out of the final runtime images.
-
-The backend additionally uses:
-
-```bash
-npm prune --omit=dev
-```
-
-to remove development dependencies before they are copied into the runtime image.
-
-The frontend uses Next.js:
-
-```ts
-output: "standalone"
-```
-
-which creates a smaller self-contained production server.
-
-## 6. Health Checks and Start Order
-
-A running container does not necessarily mean that the application inside it is ready.
-
-PostgreSQL therefore checks its readiness using `pg_isready`.
-
-The backend waits until the database is healthy before starting. The backend then checks its own `/dashboard/stats` endpoint, and the frontend waits until the backend is healthy.
-
-The startup sequence is therefore:
-
-```text
-PostgreSQL starts
-       ↓
-Database becomes healthy
-       ↓
-Backend starts
-       ↓
-Backend becomes healthy
-       ↓
-Frontend starts
-```
-
-Health status can be inspected using:
-
-```bash
-docker compose ps
-```
-
-## 7. Volumes and Persistence
-
-PostgreSQL stores its data in the named volume `coffee-db-data`, mounted at `/var/lib/postgresql/data`.
-
-The volume exists independently of the database container.
-
-| Command | Containers | Network | Volume and Data |
-| --- | --- | --- | --- |
-| `docker compose stop` | Stopped | Kept | Kept |
-| `docker compose down` | Removed | Removed | Kept |
-| `docker compose down -v` | Removed | Removed | **Deleted** |
-
-Persistence was tested by creating a bean, removing the containers with `docker compose down`, starting the environment again and confirming that the bean still existed.
-
-## 8. Networking
-
-All three services share the named Docker network `coffee-net`.
-
-Docker provides internal DNS resolution, allowing containers to communicate using service names instead of changing IP addresses.
-
-| Service | Host Access | Internal Docker Address |
-| --- | --- | --- |
-| `frontend` | `localhost:3001` | `frontend:3000` |
-| `backend` | `localhost:3000` | `backend:3000` |
-| `db` | None | `db:5432` |
-
-The backend publishes port `3000` because browser-side code calls it directly.
-
-PostgreSQL does not publish port `5432` to the host because only the backend needs database access.
-
-## 9. Security and Efficiency
+## 8. Security and efficiency
 
 | Choice | Effect |
-| --- | --- |
-| Multi-stage builds | Build tools and unnecessary files stay out of runtime images |
-| `node:24-alpine` | Provides a small Node.js base image |
-| `npm prune --omit=dev` | Removes backend development dependencies |
-| Next.js standalone output | Reduces frontend runtime requirements |
-| Dependency layers before source | Allows Docker to cache `npm ci` |
-| `USER node` | Application processes do not run as root |
-| No database host port | PostgreSQL is only accessible through `coffee-net` |
-| Resource limits | Prevent services from consuming unrestricted host resources |
+| ------ | ------ |
+| Multi-stage builds | No source code, compiler or test tools in the runtime images |
+| `alpine` base images | Small base with fewer packages |
+| `npm prune --omit=dev` | Only production dependencies in the backend image |
+| Next.js `output: "standalone"` | Frontend runs a small self-contained server |
+| `COPY package*.json` before `COPY .` | `npm ci` is cached, so rebuilds are faster |
+| `USER node` | The apps do not run as root |
+| No host port on `db` | The database is only reachable inside `coffee-net` |
+| Resource limits | No container can take the whole machine |
 
-The application user can be verified with:
+Measured with `docker image ls` (backend, Node 24):
 
-```bash
-docker compose exec backend whoami
-docker compose exec frontend whoami
-```
+| Image | Disk usage | Compressed |
+| ----- | ---------- | ---------- |
+| `coffee-tracker-backend-test` (source + all dev dependencies) | 728 MB | 148 MB |
+| `coffee-tracker-backend` (final runtime image) | 388 MB | 78 MB |
 
-Both should return:
+Verified, not just declared: `docker compose exec backend whoami` returns `node`.
 
-```text
-node
-```
+**Trade-off:** Alpine uses `musl` instead of `glibc`, which can break native Node modules. It has not affected this project.
 
-This means the application processes run as non-root users inside their containers. It does not mean that the Docker daemon itself is running in rootless mode.
-
-### Resource Limits
-
-| Service | CPU | Memory |
-| --- | ---: | ---: |
-| `db` | 0.5 CPU | 256 MB |
-| `backend` | 0.5 CPU | 256 MB |
-| `frontend` | 0.5 CPU | 512 MB |
-
-Runtime usage can be inspected with:
+## 9. Testing and verification
 
 ```bash
-docker stats --no-stream
+docker compose config                      # configuration is valid
+docker compose ps                          # db and backend show (healthy)
+docker compose logs backend --tail=20      # "Nest application successfully started"
+docker compose run --rm --build backend-test   # unit tests, 14 passed
+docker compose exec db psql -U coffee coffee_tracker   # then: TABLE bean;  \q to exit
+docker compose exec backend whoami         # node
+docker stats --no-stream                   # CPU and memory per container
 ```
 
-### Image Size
+The unit tests run in Docker through the `backend-test` service. It has the profile `test`, so `docker compose up` does not start it. The tests mock the database and check logic such as the average rating and rejecting a brew for a bean that does not exist. Use `--build` after code changes, otherwise `run` reuses the old test image.
 
-Measured with `docker image ls`:
+## 10. Limitations and next steps
 
-| Backend Image | Disk Usage | Compressed |
-| --- | ---: | ---: |
-| Source + development dependencies | 728 MB | 148 MB |
-| Final runtime image | 388 MB | 78 MB |
+| Limitation or choice | Effect | Status |
+| -------------------- | ------ | ------ |
+| `localhost:3000` is hard-coded in browser code and CORS | Runs locally only | Deliberate: the project is for local use |
+| TypeORM `synchronize: true` instead of migrations | Schema updates automatically on start | Deliberate: small local project without production data |
+| Tests need Node 24 because several Nest packages are ES modules | May fail with an older local Node | Run them in Docker with `backend-test` |
+| Unit tests only, no end-to-end test | Browser-to-database flow is tested manually | Next step |
 
-The final backend runtime image is approximately 47% smaller on disk.
+## Project structure
 
-## 10. Testing and Verification
-
-Validate the Compose configuration:
-
-```bash
-docker compose config
 ```
-
-Check container health:
-
-```bash
-docker compose ps
-```
-
-Inspect backend logs:
-
-```bash
-docker compose logs backend --tail=20
-```
-
-Run the backend unit tests in Docker:
-
-```bash
-docker compose run --rm --build backend-test
-```
-
-The `backend-test` service uses the `test` profile, so it is not started during a normal `docker compose up`.
-
-Verify that the applications run as non-root:
-
-```bash
-docker compose exec backend whoami
-docker compose exec frontend whoami
-```
-
-Inspect runtime resource usage:
-
-```bash
-docker stats --no-stream
-```
-
-## 11. Development Setup
-
-An optional `docker-compose.dev.yml` provides a development configuration with mounted source folders and hot reload.
-
-It can be started with:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-```
-
-The backend uses `npm run start:dev` and the frontend uses `npm run dev`.
-
-This development configuration is optional and has not been fully verified.
-
-## 12. Limitations and Next Steps
-
-| Limitation | Current Approach |
-| --- | --- |
-| Browser API URL and CORS use localhost | Intended for local development |
-| TypeORM uses `synchronize: true` | Suitable for the current local project; migrations would be preferable for production |
-| Backend has unit tests but no automated end-to-end tests | Full application flow is currently tested manually |
-| Development Compose setup has not been fully verified | Optional future improvement |
-
-Possible future improvements include:
-
-- TypeORM database migrations
-- Automated end-to-end testing
-- CI/CD for automated builds and tests
-- Production secrets management
-- Deployment to a remote environment
-
-## Project Structure
-
-```text
 coffee-tracker/
-├── backend/
-│   ├── src/
-│   └── Dockerfile
-├── frontend/
-│   ├── app/
-│   └── Dockerfile
+├── backend/               NestJS API + Dockerfile
+├── frontend/              Next.js app + Dockerfile
 ├── docker-compose.yml
-├── docker-compose.dev.yml
 ├── .env.example
 └── README.md
 ```
 
----
-
-Built for the Web PBA Autumn 2026 Development Environments project: containerizing an existing full-stack application with Docker and Docker Compose.
+Built for the Web PBA Autumn 2026 Development Environments project: containerising an existing web application with Docker and Docker Compose.
